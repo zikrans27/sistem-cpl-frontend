@@ -429,8 +429,8 @@
             <!-- ROW 6: Column headers -->
             <tr class="col-header">
               <th class="left" style="width: 50px">No.</th>
-              <th>NIM</th>
-              <th class="left">Nama</th>
+              <th style="width: 140px">NIM</th>
+              <th class="left" style="width: 220px">Nama</th>
               <template v-for="(cpl, ci) in data.cplList" :key="'ch-' + ci">
                 <template v-if="isCplEmpty(ci)">
                   <th
@@ -2247,10 +2247,12 @@ tbody td.nim {
   font-size: 0.82rem;
   color: #5c6bc0;
   font-weight: 500;
+  min-width: 140px;
 }
 tbody td.nama {
   text-align: left;
   font-weight: 500;
+  min-width: 220px;
 }
 
 tbody td input {
