@@ -1576,9 +1576,11 @@ function nomorKomponenDuplikat(sub) {
 }
 
 function refreshAllLabels() {
+  // Counter global (bukan per-CPMK) supaya penomoran komponen berlanjut
+  // terus dari CPL 1 -> CPL 2 -> dst, tidak reset tiap ganti CPMK.
+  const counter = {};
   data.cplList.forEach((cpl) =>
     cpl.cpmkList.forEach((cpmk) => {
-      const counter = {};
       cpmk.subCpmkList.forEach((sub) => {
         sub.bobotItems.forEach((item) => {
           counter[item.nama] = (counter[item.nama] || 0) + 1;
