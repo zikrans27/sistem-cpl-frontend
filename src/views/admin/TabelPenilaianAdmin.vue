@@ -1837,18 +1837,19 @@ function renderCPMKChart() {
 
 function renderCPLChart() {
   const labels = [];
-  const datasetsMap = {};
+  const semuaCPMK = allCPMKNames.value;
+  const datasets = semuaCPMK.map((cpmkName, i) => ({
+    label: cpmkName,
+    data: [],
+    backgroundColor: CPL_COLORS[i % CPL_COLORS.length],
+  }));
   data.cplList.forEach((cpl, ci) => {
     labels.push(cpl.name);
-    cpl.cpmkList.forEach((cpmk, mi) => {
-      if (!datasetsMap[cpmk.name]) {
-        datasetsMap[cpmk.name] = {
-          label: cpmk.name,
-          data: [],
-          backgroundColor: CPL_COLORS[mi % CPL_COLORS.length],
-        };
-      }
-      datasetsMap[cpmk.name].data.push(Number(rataCPMK(ci, mi).toFixed(2)));
+    semuaCPMK.forEach((cpmkName, cpmkIndex) => {
+      const mi = cpl.cpmkList.findIndex((c) => c.name === cpmkName);
+      datasets[cpmkIndex].data.push(
+        mi !== -1 ? Number(rataCPMK(ci, mi).toFixed(2)) : 0,
+      );
     });
   });
   const ctx = cplChartRef.value;
@@ -1856,7 +1857,7 @@ function renderCPLChart() {
   if (cplChart) cplChart.destroy();
   cplChart = new Chart(ctx, {
     type: "bar",
-    data: { labels, datasets: Object.values(datasetsMap) },
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
