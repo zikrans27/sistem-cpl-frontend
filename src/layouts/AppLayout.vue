@@ -1,6 +1,6 @@
 <template>
   <!-- SIDEBAR -->
-  <aside class="sidebar" v-if="!hideSidebar">
+  <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="logo-box">
         <img src="/assets/Logo PNUP.png" alt="Logo PNUP" @error="e => e.target.style.display='none'" />
@@ -27,7 +27,7 @@
   </aside>
 
   <!-- TOPBAR -->
-  <header class="topbar" :class="{ 'full-width': hideSidebar }">
+  <header class="topbar">
     <div class="topbar-user" @click="handleLogout">
       <div class="user-avatar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -44,7 +44,7 @@
   </header>
 
   <!-- MAIN SLOT -->
-  <main class="main" :class="{ 'full-width': hideSidebar }">
+  <main class="main">
     <slot />
   </main>
 </template>
@@ -57,7 +57,6 @@ import { useAuthStore } from '@/stores/auth'
 const props = defineProps({
   navItems: { type: Array, default: () => [] },
   userName: { type: String, default: 'Pengguna' },
-  hideSidebar: { type: Boolean, default: false },
 })
 
 const router = useRouter()
@@ -183,13 +182,6 @@ function handleLogout() {
   padding: 28px;
   min-height: calc(100vh - 64px);
   background: #f3f4f6;
-}
-
-.topbar.full-width {
-  left: 0;
-}
-.main.full-width {
-  margin-left: 0;
 }
 
 @media (max-width: 768px) {
