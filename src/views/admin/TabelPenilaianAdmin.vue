@@ -1,5 +1,5 @@
 <template>
-  <AppLayout :navItems="navItems" userName="Admin" hide-sidebar>
+  <AppLayout :navItems="navItems" userName="Admin">
     <!-- PAGE HEADER -->
     <div class="page-header">
       <RouterLink to="/admin/dashboard" class="back-btn">
