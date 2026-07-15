@@ -160,8 +160,8 @@
                     >
                       {{ cpmk.name }} ({{ cpmk.persen }}%)
                       <template v-if="manageMode">
-                        <!-- Edit button — ganti semua ✏️ dengan ini -->
-                        <button class="edit-btn" @click.stop="editCPL(ci)">
+                        <!-- Edit button — hanya edit CPMK ini -->
+                        <button class="edit-btn" @click.stop="editCPMK(ci, mi)">
                           <svg
                             viewBox="0 0 24 24"
                             fill="none"
@@ -177,8 +177,8 @@
                           </svg>
                         </button>
 
-                        <!-- Delete button — ganti semua 🗑️ dengan ini -->
-                        <button class="delete-btn" @click.stop="deleteCPL(ci)">
+                        <!-- Delete button — hanya hapus CPMK ini -->
+                        <button class="delete-btn" @click.stop="deleteCPMK(ci, mi)">
                           <svg
                             viewBox="0 0 24 24"
                             fill="none"
@@ -228,8 +228,8 @@
                       >
                         {{ sub.name }}
                         <template v-if="manageMode">
-                          <!-- Edit button — ganti semua ✏️ dengan ini -->
-                          <button class="edit-btn" @click.stop="editCPL(ci)">
+                          <!-- Edit button — hanya edit Sub-CPMK ini -->
+                          <button class="edit-btn" @click.stop="editSubCPMK(ci, mi, si)">
                             <svg
                               viewBox="0 0 24 24"
                               fill="none"
@@ -245,10 +245,10 @@
                             </svg>
                           </button>
 
-                          <!-- Delete button — ganti semua 🗑️ dengan ini -->
+                          <!-- Delete button — hanya hapus Sub-CPMK ini -->
                           <button
                             class="delete-btn"
-                            @click.stop="deleteCPL(ci)"
+                            @click.stop="deleteSubCPMK(ci, mi, si)"
                           >
                             <svg
                               viewBox="0 0 24 24"
@@ -302,8 +302,8 @@
                       >
                         {{ sub.totalBobot }}
                         <template v-if="manageMode">
-                          <!-- Edit button — ganti semua ✏️ dengan ini -->
-                          <button class="edit-btn" @click.stop="editCPL(ci)">
+                          <!-- Edit button — edit Total Bobot Sub-CPMK ini -->
+                          <button class="edit-btn" @click.stop="editSubCPMK(ci, mi, si)">
                             <svg
                               viewBox="0 0 24 24"
                               fill="none"
@@ -319,10 +319,10 @@
                             </svg>
                           </button>
 
-                          <!-- Delete button — ganti semua 🗑️ dengan ini -->
+                          <!-- Delete button — hapus Sub-CPMK ini -->
                           <button
                             class="delete-btn"
-                            @click.stop="deleteCPL(ci)"
+                            @click.stop="deleteSubCPMK(ci, mi, si)"
                           >
                             <svg
                               viewBox="0 0 24 24"
@@ -375,8 +375,8 @@
                         <td :style="colBorderStyle(ci, mi, si, bi)">
                           {{ b.bobot }}
                           <template v-if="manageMode">
-                            <!-- Edit button — ganti semua ✏️ dengan ini -->
-                            <button class="edit-btn" @click.stop="editCPL(ci)">
+                            <!-- Edit button — edit komponen bobot ini -->
+                            <button class="edit-btn" @click.stop="editKomponen(ci, mi, si, bi)">
                               <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -392,10 +392,10 @@
                               </svg>
                             </button>
 
-                            <!-- Delete button — ganti semua 🗑️ dengan ini -->
+                            <!-- Delete button — hapus komponen bobot ini -->
                             <button
                               class="delete-btn"
-                              @click.stop="deleteCPL(ci)"
+                              @click.stop="deleteKomponen(ci, mi, si, bi)"
                             >
                               <svg
                                 viewBox="0 0 24 24"
@@ -474,8 +474,8 @@
                             </svg>
                           </button>
                           <template v-if="manageMode">
-                            <!-- Edit button — ganti semua ✏️ dengan ini -->
-                            <button class="edit-btn" @click.stop="editCPL(ci)">
+                            <!-- Edit button — edit komponen bobot ini -->
+                            <button class="edit-btn" @click.stop="editKomponen(ci, mi, si, bi)">
                               <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -491,10 +491,10 @@
                               </svg>
                             </button>
 
-                            <!-- Delete button — ganti semua 🗑️ dengan ini -->
+                            <!-- Delete button — hapus komponen bobot ini -->
                             <button
                               class="delete-btn"
-                              @click.stop="deleteCPL(ci)"
+                              @click.stop="deleteKomponen(ci, mi, si, bi)"
                             >
                               <svg
                                 viewBox="0 0 24 24"
