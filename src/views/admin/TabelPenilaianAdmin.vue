@@ -54,12 +54,6 @@
       <button class="btn btn-green" @click="openModalSubCPMK">
         <span class="icon-plus">+</span> Tambah Sub-CPMK &amp; Bobot
       </button>
-      <button class="btn btn-secondary" @click="addMahasiswaRow">
-        Tambah Baris
-      </button>
-      <button class="btn btn-secondary" @click="removeLastRow">
-        Hapus Baris
-      </button>
     </div>
 
     <!-- TABLE WRAPPER -->
@@ -69,6 +63,24 @@
         <span class="badge">{{ data.cplList.length }} CPL</span>
         <span class="badge">{{ totalCPMK }} CPMK</span>
         <span class="badge">{{ totalSubCPMK }} Sub-CPMK</span>
+
+        <!-- ROW CONTROLS: hanya muncul saat Edit Mode aktif -->
+        <div class="row-controls" v-if="manageMode">
+          <span class="row-controls-label">Jumlah Baris</span>
+          <input
+            type="number"
+            min="1"
+            v-model.number="jumlahBarisInput"
+            class="row-count-input"
+            placeholder="1"
+          />
+          <button class="btn btn-secondary btn-sm" @click="addMahasiswaRow">
+            <span class="icon-plus">+</span> Tambah Baris
+          </button>
+          <button class="btn btn-secondary btn-sm" @click="removeLastRow">
+            <span class="icon-minus">−</span> Hapus Baris
+          </button>
+        </div>
       </div>
 
       <div class="table-scroll">
@@ -1098,6 +1110,9 @@ const navItems = [
 // ── STATE ──
 const manageMode = ref(false);
 
+// Jumlah baris yang akan ditambah/dihapus (input di dekat tabel, aktif saat Edit Mode)
+const jumlahBarisInput = ref(1);
+
 function getDefaultData() {
   return {
     cplList: [],
@@ -1439,18 +1454,39 @@ function toggleManageMode() {
   manageMode.value = !manageMode.value;
 }
 
-// ── ADD/REMOVE MAHASISWA ──
+// ── ADD/REMOVE MAHASISWA (jumlah baris bisa diatur, hanya aktif saat Edit Mode) ──
 function addMahasiswaRow() {
-  data.mahasiswa.push({ nim: "", nama: "", nilai: {} });
+  const jumlah =
+    jumlahBarisInput.value && jumlahBarisInput.value > 0
+      ? Math.floor(jumlahBarisInput.value)
+      : 1;
+  for (let i = 0; i < jumlah; i++) {
+    data.mahasiswa.push({ nim: "", nama: "", nilai: {} });
+  }
   saveData();
 }
+
 function removeLastRow() {
+  const jumlah =
+    jumlahBarisInput.value && jumlahBarisInput.value > 0
+      ? Math.floor(jumlahBarisInput.value)
+      : 1;
+
   if (data.mahasiswa.length <= 1) {
     alert("Minimal 1 baris mahasiswa!");
     return;
   }
-  if (!confirm("Hapus baris mahasiswa terakhir?")) return;
-  data.mahasiswa.pop();
+
+  const sisa = data.mahasiswa.length - jumlah;
+  if (sisa < 1) {
+    alert(
+      `Tidak bisa menghapus ${jumlah} baris. Minimal 1 baris mahasiswa harus tersisa (saat ini ${data.mahasiswa.length} baris).`,
+    );
+    return;
+  }
+
+  if (!confirm(`Hapus ${jumlah} baris mahasiswa terakhir?`)) return;
+  data.mahasiswa.splice(-jumlah, jumlah);
   saveData();
 }
 
@@ -1986,7 +2022,15 @@ onMounted(async () => {
 .btn-dark:hover {
   background: #1e293b;
 }
+.btn-sm {
+  padding: 7px 12px;
+  font-size: 0.76rem;
+}
 .icon-plus {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.icon-minus {
   font-size: 1.1rem;
   line-height: 1;
 }
@@ -2055,6 +2099,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .table-header h2 {
   font-size: 1rem;
@@ -2072,6 +2117,40 @@ onMounted(async () => {
 }
 .table-scroll {
   overflow-x: auto;
+}
+
+/* ── ROW CONTROLS (Tambah/Hapus Baris — hanya tampil saat Edit Mode) ── */
+.row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.row-controls-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.row-count-input {
+  width: 64px;
+  padding: 7px 10px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.85rem;
+  text-align: center;
+  color: #1a1d2e;
+  background: #f9fafb;
+  transition: all 0.2s;
+}
+.row-count-input:focus {
+  outline: none;
+  border-color: #9b1530;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(155, 21, 48, 0.08);
 }
 
 /* ── TABLE ── */
