@@ -54,6 +54,22 @@
       <button class="btn btn-green" @click="openModalSubCPMK">
         <span class="icon-plus">+</span> Tambah Sub-CPMK &amp; Bobot
       </button>
+      <button class="btn btn-secondary" @click="exportToExcel" :disabled="exporting">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          style="width: 15px; height: 15px"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {{ exporting ? "Membuat Excel..." : "Export Excel" }}
+      </button>
     </div>
 
     <!-- TABLE WRAPPER -->
@@ -1055,6 +1071,9 @@ import AppLayout from "@/layouts/AppLayout.vue";
 import { useMataKuliahStore } from "@/stores/mataKuliah";
 import Chart from "chart.js/auto";
 import api from "@/api/axios";
+// npm install exceljs file-saver
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 // ── CONSTANTS ──
 const KOMPONEN_LIST = [
@@ -1729,6 +1748,320 @@ function isiSemuaKolom(ci, mi, si, bi) {
     mhs.nilai[key] = angka;
   });
   saveData();
+}
+
+// ── EXPORT KE EXCEL (format: Struktur Penilaian, Rekap Sub-CPMK, Rekap CPMK, Rekap CPL) ──
+const exporting = ref(false);
+
+const HEADER_FILL = "FF9B1530"; // merah PNUP
+const HEADER_FONT = { bold: true, color: { argb: "FFFFFFFF" } };
+const THIN_BORDER = {
+  top: { style: "thin", color: { argb: "FFD1D5DB" } },
+  left: { style: "thin", color: { argb: "FFD1D5DB" } },
+  bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+  right: { style: "thin", color: { argb: "FFD1D5DB" } },
+};
+const CENTER = { vertical: "middle", horizontal: "center" };
+
+// Daftar kolom penilaian (No/NIM/Nama dikecualikan), hanya sub-CPMK yang punya komponen bobot
+function getColumnPlan() {
+  const plan = [];
+  data.cplList.forEach((cpl, ci) =>
+    cpl.cpmkList.forEach((cpmk, mi) =>
+      cpmk.subCpmkList.forEach((sub, si) =>
+        sub.bobotItems.forEach((b, bi) => {
+          plan.push({ ci, mi, si, bi, label: b.label || b.nama, bobot: b.bobot });
+        }),
+      ),
+    ),
+  );
+  return plan;
+}
+
+function styleHeaderRow(ws, rowNum, colFrom, colTo) {
+  for (let c = colFrom; c <= colTo; c++) {
+    const cell = ws.getCell(rowNum, c);
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+    cell.font = HEADER_FONT;
+    cell.alignment = CENTER;
+    cell.border = THIN_BORDER;
+  }
+}
+
+function styleDataRow(ws, rowNum, colFrom, colTo) {
+  for (let c = colFrom; c <= colTo; c++) {
+    const cell = ws.getCell(rowNum, c);
+    cell.alignment = CENTER;
+    cell.border = THIN_BORDER;
+  }
+}
+
+async function exportToExcel() {
+  if (exporting.value) return;
+  exporting.value = true;
+  try {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Tabel Penilaian");
+
+    const plan = getColumnPlan();
+    const FIXED = 3; // No, NIM, Nama
+    const totalCols = FIXED + plan.length || FIXED + 1;
+
+    // ── JUDUL ──
+    ws.mergeCells(1, 1, 1, totalCols);
+    ws.getCell(1, 1).value = mk.value?.name || "Tabel Penilaian";
+    ws.getCell(1, 1).font = { bold: true, size: 14 };
+    ws.mergeCells(2, 1, 2, totalCols);
+    ws.getCell(2, 1).value = mk.value?.semester || "Semester Aktif";
+
+    let r = 4;
+
+    if (plan.length > 0) {
+      // ── ROW CPL ──
+      ws.getCell(r, 1).value = "CPL";
+      ws.mergeCells(r, 1, r, FIXED);
+      {
+        let idx = 0;
+        while (idx < plan.length) {
+          const { ci } = plan[idx];
+          let span = 0;
+          while (idx + span < plan.length && plan[idx + span].ci === ci) span++;
+          const col = FIXED + idx + 1;
+          if (span > 1) ws.mergeCells(r, col, r, col + span - 1);
+          ws.getCell(r, col).value = data.cplList[ci].name;
+          idx += span;
+        }
+      }
+      styleHeaderRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── ROW CPMK ──
+      ws.getCell(r, 1).value = "CPMK";
+      ws.mergeCells(r, 1, r, FIXED);
+      {
+        let idx = 0;
+        while (idx < plan.length) {
+          const { ci, mi } = plan[idx];
+          let span = 0;
+          while (
+            idx + span < plan.length &&
+            plan[idx + span].ci === ci &&
+            plan[idx + span].mi === mi
+          )
+            span++;
+          const col = FIXED + idx + 1;
+          if (span > 1) ws.mergeCells(r, col, r, col + span - 1);
+          const cpmk = data.cplList[ci].cpmkList[mi];
+          ws.getCell(r, col).value = `${cpmk.name} (${cpmk.persen}%)`;
+          idx += span;
+        }
+      }
+      styleHeaderRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── ROW Sub-CPMK ──
+      ws.getCell(r, 1).value = "Sub-CPMK";
+      ws.mergeCells(r, 1, r, FIXED);
+      {
+        let idx = 0;
+        while (idx < plan.length) {
+          const { ci, mi, si } = plan[idx];
+          let span = 0;
+          while (
+            idx + span < plan.length &&
+            plan[idx + span].ci === ci &&
+            plan[idx + span].mi === mi &&
+            plan[idx + span].si === si
+          )
+            span++;
+          const col = FIXED + idx + 1;
+          if (span > 1) ws.mergeCells(r, col, r, col + span - 1);
+          const sub = data.cplList[ci].cpmkList[mi].subCpmkList[si];
+          ws.getCell(r, col).value = sub.name;
+          idx += span;
+        }
+      }
+      styleHeaderRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── ROW Total Bobot ──
+      ws.getCell(r, 1).value = "Total Bobot";
+      ws.mergeCells(r, 1, r, FIXED);
+      {
+        let idx = 0;
+        while (idx < plan.length) {
+          const { ci, mi, si } = plan[idx];
+          let span = 0;
+          while (
+            idx + span < plan.length &&
+            plan[idx + span].ci === ci &&
+            plan[idx + span].mi === mi &&
+            plan[idx + span].si === si
+          )
+            span++;
+          const col = FIXED + idx + 1;
+          if (span > 1) ws.mergeCells(r, col, r, col + span - 1);
+          const sub = data.cplList[ci].cpmkList[mi].subCpmkList[si];
+          ws.getCell(r, col).value = sub.totalBobot;
+          idx += span;
+        }
+      }
+      styleDataRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── ROW Bobot per kolom ──
+      ws.getCell(r, 1).value = "Bobot";
+      ws.mergeCells(r, 1, r, FIXED);
+      plan.forEach((p, i) => {
+        ws.getCell(r, FIXED + i + 1).value = p.bobot;
+      });
+      styleDataRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── ROW Header kolom ──
+      ws.getCell(r, 1).value = "No.";
+      ws.getCell(r, 2).value = "NIM";
+      ws.getCell(r, 3).value = "Nama";
+      plan.forEach((p, i) => {
+        ws.getCell(r, FIXED + i + 1).value = p.label;
+      });
+      styleHeaderRow(ws, r, 1, totalCols);
+      r++;
+
+      // ── DATA MAHASISWA ──
+      data.mahasiswa.forEach((mhs, rowIdx) => {
+        ws.getCell(r, 1).value = rowIdx + 1;
+        ws.getCell(r, 2).value = mhs.nim || "";
+        ws.getCell(r, 3).value = mhs.nama || "";
+        ws.getCell(r, 3).alignment = { horizontal: "left", vertical: "middle" };
+        plan.forEach((p, i) => {
+          const v = mhs.nilai?.[nilaiKey(p.ci, p.mi, p.si, p.bi)];
+          ws.getCell(r, FIXED + i + 1).value =
+            v !== undefined && v !== "" && !isNaN(parseFloat(v)) ? Number(v) : null;
+        });
+        styleDataRow(ws, r, 1, totalCols);
+        r++;
+      });
+
+      // ── RATA-RATA ──
+      ws.getCell(r, 1).value = "Rata-rata";
+      ws.mergeCells(r, 1, r, FIXED);
+      plan.forEach((p, i) => {
+        const avg = avgKolom(p.ci, p.mi, p.si, p.bi);
+        ws.getCell(r, FIXED + i + 1).value = avg > 0 ? Number(avg.toFixed(1)) : null;
+      });
+      styleHeaderRow(ws, r, 1, totalCols);
+      r += 3;
+    } else {
+      ws.getCell(r, 1).value = "Belum ada data CPL/CPMK/Sub-CPMK.";
+      r += 2;
+    }
+
+    // ── REKAP HASIL UKUR PENCAPAIAN SUB-CPMK ──
+    ws.getCell(r, 1).value = "Rekap Hasil Ukur Pencapaian Sub-CPMK";
+    ws.getCell(r, 1).font = { bold: true, size: 12 };
+    r++;
+    const komHeaders = komponenHeaders.value;
+    const rekapSubCols = 1 + komHeaders.length + 3;
+    ws.getCell(r, 1).value = "Sub-CPMK";
+    komHeaders.forEach((h, i) => (ws.getCell(r, 2 + i).value = h));
+    ws.getCell(r, 2 + komHeaders.length).value = "Total Bobot yang Diperoleh";
+    ws.getCell(r, 3 + komHeaders.length).value = "Bobot Maksimum";
+    ws.getCell(r, 4 + komHeaders.length).value = "Skala Pencapaian";
+    styleHeaderRow(ws, r, 1, rekapSubCols);
+    r++;
+    data.cplList.forEach((cpl, ci) =>
+      cpl.cpmkList.forEach((cpmk, mi) =>
+        cpmk.subCpmkList.forEach((sub, si) => {
+          ws.getCell(r, 1).value = sub.name;
+          komHeaders.forEach((h, i) => {
+            const val = nilaiKomponenSub(ci, mi, si, h);
+            ws.getCell(r, 2 + i).value = val === "—" ? null : Number(val);
+          });
+          ws.getCell(r, 2 + komHeaders.length).value = Number(
+            totalKomponenSub(ci, mi, si).toFixed(1),
+          );
+          ws.getCell(r, 3 + komHeaders.length).value = sub.totalBobot;
+          ws.getCell(r, 4 + komHeaders.length).value = `${skalaSub(ci, mi, si)}%`;
+          styleDataRow(ws, r, 1, rekapSubCols);
+          r++;
+        }),
+      ),
+    );
+    r += 2;
+
+    // ── REKAP HASIL PENGUKURAN CPMK (berdasarkan Sub-CPMK) ──
+    ws.getCell(r, 1).value = "Rekap Hasil Pengukuran CPMK";
+    ws.getCell(r, 1).font = { bold: true, size: 12 };
+    r++;
+    const subNames = allSubNames.value;
+    const cpmkTableCols = 1 + subNames.length + 2;
+    ws.getCell(r, 1).value = "CPMK";
+    subNames.forEach((s, i) => (ws.getCell(r, 2 + i).value = s));
+    ws.getCell(r, 2 + subNames.length).value = "Nilai Rata-rata";
+    ws.getCell(r, 3 + subNames.length).value = "Kategori";
+    styleHeaderRow(ws, r, 1, cpmkTableCols);
+    r++;
+    data.cplList.forEach((cpl, ci) =>
+      cpl.cpmkList.forEach((cpmk, mi) => {
+        ws.getCell(r, 1).value = cpmk.name;
+        subNames.forEach((s, i) => {
+          const val = nilaiSubDalamCPMK(ci, mi, s);
+          ws.getCell(r, 2 + i).value = val === "—" ? null : Number(val);
+        });
+        ws.getCell(r, 2 + subNames.length).value = Number(rataCPMK(ci, mi).toFixed(2));
+        ws.getCell(r, 3 + subNames.length).value = getKategoriCPMK(ci, mi);
+        styleDataRow(ws, r, 1, cpmkTableCols);
+        r++;
+      }),
+    );
+    r += 2;
+
+    // ── REKAP HASIL PENGUKURAN CPL (berdasarkan CPMK) ──
+    ws.getCell(r, 1).value = "Rekap Hasil Pengukuran CPL";
+    ws.getCell(r, 1).font = { bold: true, size: 12 };
+    r++;
+    const cpmkNames = allCPMKNames.value;
+    const cplTableCols = 1 + cpmkNames.length + 3;
+    ws.getCell(r, 1).value = "CPL";
+    cpmkNames.forEach((c, i) => (ws.getCell(r, 2 + i).value = c));
+    ws.getCell(r, 2 + cpmkNames.length).value = "Nilai Rata-rata";
+    ws.getCell(r, 3 + cpmkNames.length).value = "Kategori";
+    ws.getCell(r, 4 + cpmkNames.length).value = "Standar Pencapaian";
+    styleHeaderRow(ws, r, 1, cplTableCols);
+    r++;
+    data.cplList.forEach((cpl, ci) => {
+      ws.getCell(r, 1).value = cpl.name;
+      cpmkNames.forEach((c, i) => {
+        const val = nilaiCPMKDalamCPL(ci, c);
+        ws.getCell(r, 2 + i).value = val === "—" ? null : Number(val);
+      });
+      ws.getCell(r, 2 + cpmkNames.length).value = Number(rataCPL(ci).toFixed(2));
+      ws.getCell(r, 3 + cpmkNames.length).value = getKategoriCPL(ci);
+      ws.getCell(r, 4 + cpmkNames.length).value = getStandarCPL(ci) || null;
+      styleDataRow(ws, r, 1, cplTableCols);
+      r++;
+    });
+
+    // ── Lebar kolom ──
+    ws.getColumn(1).width = 6;
+    ws.getColumn(2).width = 14;
+    ws.getColumn(3).width = 26;
+    for (let c = 4; c <= totalCols; c++) ws.getColumn(c).width = 13;
+    ws.views = [{ state: "frozen", xSplit: 3, ySplit: 0 }];
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const fileName = `Tabel_Penilaian_${(mk.value?.name || "MataKuliah").replace(/\s+/g, "_")}.xlsx`;
+    saveAs(blob, fileName);
+  } catch (e) {
+    console.error("Gagal export Excel:", e);
+    alert("Gagal membuat file Excel. Cek console untuk detail error.");
+  } finally {
+    exporting.value = false;
+  }
 }
 
 // ── CHARTS ──
