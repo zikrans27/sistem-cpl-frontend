@@ -384,28 +384,36 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, reactive, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { useMataKuliahStore } from "@/stores/mataKuliah";
 import api from '@/api/axios';
 
-const nilaiSaya = ref([])
+// ── CACHE data struktur CPL + nilai, per mata kuliah, dari API ──
+// (menggantikan cara lama yang baca localStorage admin_tabel_${mkId})
+const mkNilaiCache = reactive({}); // { [mkId]: { cplList, mahasiswa } }
+const mkLoadedIds = new Set(); // cegah fetch berulang untuk mkId yang sama
 
-const loadNilai = async () => {
+async function loadMKData(mkId) {
+  if (mkLoadedIds.has(mkId)) return;
+  mkLoadedIds.add(mkId);
+
   try {
-    const res = await api.get('/nilai-saya')
-    nilaiSaya.value = res.data
+    const [strukturRes, nilaiRes] = await Promise.all([
+      api.get(`/penilaian/${mkId}/struktur`),
+      api.get(`/penilaian/${mkId}/nilai`),
+    ]);
 
-    console.log('Data Nilai:', res.data)
+    mkNilaiCache[mkId] = {
+      cplList: strukturRes.data?.struktur?.cplList || [],
+      mahasiswa: nilaiRes.data || [],
+    };
   } catch (err) {
-    console.error(err)
+    console.error(`Gagal memuat data CPL untuk MK ${mkId}:`, err);
+    mkNilaiCache[mkId] = { cplList: [], mahasiswa: [] };
   }
 }
-
-onMounted(() => {
-  loadNilai()
-})
 
 const mkStore = useMataKuliahStore();
 const router = useRouter();
@@ -523,6 +531,15 @@ const navItems = [
 
 const filteredList = computed(() => mkStore.filtered("all", searchQuery.value));
 
+// Begitu daftar MK tersedia (atau berubah karena search), pastikan data CPL-nya sudah di-fetch dari API
+watch(
+  filteredList,
+  (list) => {
+    (list || []).forEach((mk) => loadMKData(mk.id));
+  },
+  { immediate: true },
+);
+
 // ── CONSTANTS ──
 const STANDAR_MIN = 80;
 
@@ -531,12 +548,7 @@ function nilaiKey(ci, mi, si, bi) {
 }
 
 function getMKData(mkId) {
-  try {
-    const raw = localStorage.getItem(`admin_tabel_${mkId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return mkNilaiCache[mkId] || null;
 }
 
 // Hitung nilai CPL untuk satu mahasiswa (object mhs)
