@@ -41,8 +41,15 @@
       </button>
     </div>
 
+    <!-- LOADING STATE -->
+    <div v-if="loading" class="ht-empty">
+      <div class="ht-empty-icon">⏳</div>
+      <h3>Memuat Data...</h3>
+      <p>Sedang mengambil data penilaian dari server.</p>
+    </div>
+
     <!-- EMPTY STATE -->
-    <div v-if="!hasData" class="ht-empty">
+    <div v-else-if="!hasData" class="ht-empty">
       <div class="ht-empty-icon">📭</div>
       <h3>Data Belum Tersedia</h3>
       <p>
@@ -501,6 +508,7 @@ import { ref, reactive, computed, watch, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import { useMataKuliahStore } from "@/stores/mataKuliah";
+import api from "@/api/axios";
 import Chart from "chart.js/auto";
 
 // ── ROUTE & STORE ──
@@ -508,7 +516,7 @@ const route = useRoute();
 const mkStore = useMataKuliahStore();
 const mkId = route.params.id || "1";
 const mk = computed(() => mkStore.getById(mkId));
-const STORAGE_KEY = `admin_tabel_${mkId}`;
+const STORAGE_KEY = `admin_tabel_${mkId}`; // fallback lama, cuma dipakai kalau API gagal
 const STANDAR_MIN = 80;
 
 // ── SIDEBAR NAV (custom — "Hasil CPL" item, auto-active via route match) ──
@@ -525,20 +533,39 @@ const navItems = [
   },
 ];
 
-// ── LOAD DATA (read-only) ──
-function loadData() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {}
-  return {};
-}
-
+// ── LOAD DATA dari API (bukan localStorage lagi) ──
 const data = reactive({
   cplList: [],
   mahasiswa: [],
-  ...loadData(),
 });
+const loading = ref(true);
+
+async function loadData() {
+  loading.value = true;
+  try {
+    const [strukturRes, nilaiRes] = await Promise.all([
+      api.get(`/penilaian/${mkId}/struktur`),
+      api.get(`/penilaian/${mkId}/nilai`),
+    ]);
+    data.cplList = strukturRes.data?.struktur?.cplList || [];
+    data.mahasiswa = nilaiRes.data || [];
+  } catch (err) {
+    console.error("Gagal memuat data Hasil CPL dari API:", err);
+    // fallback: coba localStorage biar tidak total kosong kalau API bermasalah
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        data.cplList = parsed.cplList || [];
+        data.mahasiswa = parsed.mahasiswa || [];
+      }
+    } catch (e) {
+      // ignore
+    }
+  } finally {
+    loading.value = false;
+  }
+}
 
 // ── EMPTY STATE ──
 const hasData = computed(
@@ -683,7 +710,7 @@ const wideTableRows = computed(() => {
 
       const jumlahCpmk = cpl.cpmkList.length;
       const pctCpl = jumlahCpmk > 0 ? sumCplRaw / jumlahCpmk : 0;
-      
+
       const ok = pctCpl >= STANDAR_MIN;
       if (!ok) allOk = false;
       return { cplName: cpl.name, pct: pctCpl, ok };
@@ -896,7 +923,8 @@ watch(
   { deep: true },
 );
 
-onMounted(() => {
+onMounted(async () => {
+  await loadData();
   nextTick(() => renderRadarChart());
 });
 </script>
