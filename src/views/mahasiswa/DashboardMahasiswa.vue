@@ -419,6 +419,13 @@ const mkStore = useMataKuliahStore();
 const router = useRouter();
 const viewMode = ref("grid");
 
+// Pastikan daftar mata kuliah selalu diambil dari API saat halaman dibuka —
+// jangan cuma mengandalkan localStorage (pinia persist), yang bisa kosong
+// di browser/sesi yang belum pernah memuat data ini sebelumnya.
+onMounted(() => {
+  mkStore.fetch();
+});
+
 function getMKIcon(name) {
   const n = name.toLowerCase();
   if (n.includes("mobile") || n.includes("android") || n.includes("ios"))
