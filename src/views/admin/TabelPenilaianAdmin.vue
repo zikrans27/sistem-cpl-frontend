@@ -817,13 +817,13 @@
                   </td>
                   <td>{{ rataCPMK(ci, mi).toFixed(2) }}</td>
                   <td>
-                    <input
-                      type="text"
-                      :value="getKategoriCPMK(ci, mi)"
-                      @change="(e) => setKategoriCPMK(ci, mi, e.target.value)"
-                      placeholder="Kategori"
-                      class="kategori-input"
-                    />
+                    <!-- Kategori otomatis berdasarkan Nilai Rata-rata CPMK -->
+                    <span
+                      class="kategori-badge"
+                      :class="kategoriClass(rataCPMK(ci, mi))"
+                    >
+                      {{ kategoriOtomatis(rataCPMK(ci, mi)) }}
+                    </span>
                   </td>
                 </tr>
               </template>
@@ -865,13 +865,13 @@
                 </td>
                 <td>{{ rataCPL(ci).toFixed(2) }}</td>
                 <td>
-                  <input
-                    type="text"
-                    :value="getKategoriCPL(ci)"
-                    @change="(e) => setKategoriCPL(ci, e.target.value)"
-                    placeholder="Kategori"
-                    class="kategori-input"
-                  />
+                  <!-- Kategori otomatis berdasarkan Nilai Rata-rata CPL -->
+                  <span
+                    class="kategori-badge"
+                    :class="kategoriClass(rataCPL(ci))"
+                  >
+                    {{ kategoriOtomatis(rataCPL(ci)) }}
+                  </span>
                 </td>
                 <td>
                   <input
@@ -1184,6 +1184,26 @@ function getNilaiHuruf(angka) {
   return "E";
 }
 
+// ── KATEGORI OTOMATIS (menggantikan input manual Kategori CPMK & CPL) ──
+// Setara rumus Excel:
+// =IF(nilai>=80;"High";IF(nilai>=41;"Medium";IF(nilai>=0;"Low";" ")))
+function kategoriOtomatis(nilai) {
+  const n = parseFloat(nilai);
+  if (isNaN(n)) return "-";
+  if (n >= 80) return "High";
+  if (n >= 41) return "Medium";
+  if (n >= 0) return "Low";
+  return "-";
+}
+
+function kategoriClass(nilai) {
+  const n = parseFloat(nilai);
+  if (isNaN(n)) return "kategori-low";
+  if (n >= 80) return "kategori-high";
+  if (n >= 41) return "kategori-medium";
+  return "kategori-low";
+}
+
 // ── MODAL STATE ──
 const modal = reactive({ cpl: false, cpmk: false, subCpmk: false });
 const modalData = reactive({
@@ -1431,23 +1451,7 @@ function nilaiCPMKDalamCPL(ci, cpmkHeader) {
   return mi !== -1 ? rataCPMK(ci, mi).toFixed(2) : "—";
 }
 
-// ── KATEGORI & STANDAR ──
-function getKategoriCPMK(ci, mi) {
-  return data.kategoriCPMK?.[`k_${ci}_${mi}`] || "";
-}
-function setKategoriCPMK(ci, mi, val) {
-  if (!data.kategoriCPMK) data.kategoriCPMK = {};
-  data.kategoriCPMK[`k_${ci}_${mi}`] = val;
-  saveData();
-}
-function getKategoriCPL(ci) {
-  return data.kategoriCPL?.[`kc_${ci}`] || "";
-}
-function setKategoriCPL(ci, val) {
-  if (!data.kategoriCPL) data.kategoriCPL = {};
-  data.kategoriCPL[`kc_${ci}`] = val;
-  saveData();
-}
+// ── STANDAR CPL (kategori CPMK/CPL kini otomatis, fungsi getter lama tidak dipakai di tampilan lagi) ──
 function getStandarCPL(ci) {
   return data.standarCPL?.[`sc_${ci}`] || "";
 }
@@ -2009,8 +2013,10 @@ async function exportToExcel() {
           const val = nilaiSubDalamCPMK(ci, mi, s);
           ws.getCell(r, 2 + i).value = val === "—" ? null : Number(val);
         });
-        ws.getCell(r, 2 + subNames.length).value = Number(rataCPMK(ci, mi).toFixed(2));
-        ws.getCell(r, 3 + subNames.length).value = getKategoriCPMK(ci, mi);
+        const rataCpmkVal = rataCPMK(ci, mi);
+        ws.getCell(r, 2 + subNames.length).value = Number(rataCpmkVal.toFixed(2));
+        // Kategori dihitung otomatis dari Nilai Rata-rata (bukan input manual lagi)
+        ws.getCell(r, 3 + subNames.length).value = kategoriOtomatis(rataCpmkVal);
         styleDataRow(ws, r, 1, cpmkTableCols);
         r++;
       }),
@@ -2036,8 +2042,10 @@ async function exportToExcel() {
         const val = nilaiCPMKDalamCPL(ci, c);
         ws.getCell(r, 2 + i).value = val === "—" ? null : Number(val);
       });
-      ws.getCell(r, 2 + cpmkNames.length).value = Number(rataCPL(ci).toFixed(2));
-      ws.getCell(r, 3 + cpmkNames.length).value = getKategoriCPL(ci);
+      const rataCplVal = rataCPL(ci);
+      ws.getCell(r, 2 + cpmkNames.length).value = Number(rataCplVal.toFixed(2));
+      // Kategori dihitung otomatis dari Nilai Rata-rata (bukan input manual lagi)
+      ws.getCell(r, 3 + cpmkNames.length).value = kategoriOtomatis(rataCplVal);
       ws.getCell(r, 4 + cpmkNames.length).value = getStandarCPL(ci) || null;
       styleDataRow(ws, r, 1, cplTableCols);
       r++;
@@ -2722,7 +2730,7 @@ tbody td input.nama-input {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-/* ── STANDAR/KATEGORI INPUTS (inside analysis tables) ── */
+/* ── STANDAR INPUT (inside analysis tables) ── */
 .standar-input {
   width: 80px;
   text-align: center;
@@ -2736,17 +2744,29 @@ tbody td input.nama-input {
   outline: none;
   border-color: #9b1530;
 }
-.kategori-input {
-  width: 130px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 0.82rem;
-  font-family: "Inter", sans-serif;
+
+/* ── KATEGORI BADGE (otomatis dari Nilai Rata-rata CPMK/CPL) ── */
+.kategori-badge {
+  display: inline-block;
+  min-width: 76px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.kategori-input:focus {
-  outline: none;
-  border-color: #9b1530;
+.kategori-high {
+  background: #dcfce7;
+  color: #166534;
+}
+.kategori-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+.kategori-low {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 /* ── MODALS ── */
