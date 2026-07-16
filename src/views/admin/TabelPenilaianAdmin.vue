@@ -36,7 +36,7 @@
           <path d="M12 20V4" />
           <path d="M6 20v-6" />
         </svg>
-        Lihat Hasil Pengukuran CPL
+        Lihat Pengukuran CPL per Mahasiswa
       </RouterLink>
     </div>
 
@@ -80,9 +80,9 @@
         <span class="badge">{{ totalCPMK }} CPMK</span>
         <span class="badge">{{ totalSubCPMK }} Sub-CPMK</span>
 
-        <!-- ROW CONTROLS: hanya muncul saat Edit Mode aktif -->
+        <!-- ROW CONTROLS: hanya muncul saat Edit Mode aktif (tambah baris kini ada di dalam tabel) -->
         <div class="row-controls" v-if="manageMode">
-          <span class="row-controls-label">Jumlah Baris</span>
+          <span class="row-controls-label">Hapus Baris</span>
           <input
             type="number"
             min="1"
@@ -90,11 +90,8 @@
             class="row-count-input"
             placeholder="1"
           />
-          <button class="btn btn-secondary btn-sm" @click="addMahasiswaRow">
-            <span class="icon-plus">+</span> Tambah Baris
-          </button>
           <button class="btn btn-secondary btn-sm" @click="removeLastRow">
-            <span class="icon-minus">−</span> Hapus Baris
+            <span class="icon-minus">−</span> Hapus Baris Terakhir
           </button>
         </div>
       </div>
@@ -556,6 +553,7 @@
                   v-model="data.mahasiswa[rowIdx].nim"
                   placeholder="NIM"
                   @change="saveData"
+                  @paste="(e) => handlePasteMahasiswa(rowIdx, 'nim', e)"
                   style="color: #5c6bc0; font-family: 'DM Mono', monospace"
                 />
               </td>
@@ -566,6 +564,7 @@
                   v-model="data.mahasiswa[rowIdx].nama"
                   placeholder="Nama"
                   @change="saveData"
+                  @paste="(e) => handlePasteMahasiswa(rowIdx, 'nama', e)"
                 />
               </td>
               <template
@@ -622,6 +621,13 @@
                   </template>
                 </template>
               </template>
+            </tr>
+
+            <!-- ADD ROW LINE: klik untuk menambah baris mahasiswa baru -->
+            <tr class="add-row-line" @click="addSingleRow">
+              <td colspan="1000" class="add-row-cell">
+                <span class="add-row-plus">+</span> Tambah Baris Mahasiswa
+              </td>
             </tr>
 
             <!-- RATA-RATA ROW -->
@@ -1021,31 +1027,46 @@
               v-model.number="sub.totalBobot"
               placeholder="cth: 20"
             />
-            <div
-              v-for="(k, ki) in sub.komponen"
-              :key="'k-' + i + '-' + ki"
-              class="komponen-item"
-            >
-              <select v-model="sub.komponen[ki].nama">
-                <option v-for="nama in KOMPONEN_LIST" :key="nama" :value="nama">
-                  {{ nama }}
-                </option>
-              </select>
+            <div v-for="(k, ki) in sub.komponen" :key="'k-' + i + '-' + ki">
+              <div class="komponen-item">
+                <select v-model="sub.komponen[ki].nama">
+                  <option
+                    v-for="nama in KOMPONEN_LIST_WITH_LAINNYA"
+                    :key="nama"
+                    :value="nama"
+                  >
+                    {{ nama }}
+                  </option>
+                </select>
+                <input
+                  type="number"
+                  v-model.number="sub.komponen[ki].bobot"
+                  placeholder="Bobot"
+                />
+                <button
+                  class="remove-komponen"
+                  @click="sub.komponen.splice(ki, 1)"
+                >
+                  ×
+                </button>
+              </div>
               <input
-                type="number"
-                v-model.number="sub.komponen[ki].bobot"
-                placeholder="Bobot"
+                v-if="sub.komponen[ki].nama === KOMPONEN_LAINNYA"
+                type="text"
+                v-model="sub.komponen[ki].namaCustom"
+                placeholder="Tulis nama komponen di sini"
+                class="komponen-custom-input"
               />
-              <button
-                class="remove-komponen"
-                @click="sub.komponen.splice(ki, 1)"
-              >
-                ×
-              </button>
             </div>
             <button
               class="btn-add-komponen"
-              @click="sub.komponen.push({ nama: KOMPONEN_LIST[0], bobot: 0 })"
+              @click="
+                sub.komponen.push({
+                  nama: KOMPONEN_LIST[0],
+                  bobot: 0,
+                  namaCustom: '',
+                })
+              "
             >
               + Tambah Komponen
             </button>
@@ -1086,6 +1107,10 @@ const KOMPONEN_LIST = [
   "UTS",
   "UAS",
 ];
+
+// Opsi tambahan untuk komponen bobot kustom (nama diisi manual oleh admin)
+const KOMPONEN_LAINNYA = "Lainnya (diisi manual)";
+const KOMPONEN_LIST_WITH_LAINNYA = [...KOMPONEN_LIST, KOMPONEN_LAINNYA];
 
 const SUB_COLORS = [
   { bg: "#fff4ef", accent: "#f97316", text: "#f97316" },
@@ -1477,15 +1502,44 @@ function toggleManageMode() {
   manageMode.value = !manageMode.value;
 }
 
-// ── ADD/REMOVE MAHASISWA (jumlah baris bisa diatur, hanya aktif saat Edit Mode) ──
-function addMahasiswaRow() {
-  const jumlah =
-    jumlahBarisInput.value && jumlahBarisInput.value > 0
-      ? Math.floor(jumlahBarisInput.value)
-      : 1;
-  for (let i = 0; i < jumlah; i++) {
-    data.mahasiswa.push({ nim: "", nama: "", nilai: {} });
-  }
+// ── ADD ROW (baris kosong baru dengan tanda "+" di bawah tabel) ──
+function addSingleRow() {
+  data.mahasiswa.push({ nim: "", nama: "", nilai: {} });
+  saveData();
+}
+
+// ── PASTE DARI EXCEL (NIM/Nama) ──
+// Mendukung: paste 1 sel (perilaku normal browser), paste 1 kolom (mengisi
+// ke bawah mulai dari baris saat ini), dan paste 2 kolom (NIM + Nama sekaligus).
+// Baris baru otomatis ditambahkan jika data yang di-paste lebih panjang dari
+// jumlah baris yang ada.
+function handlePasteMahasiswa(rowIdx, kolom, event) {
+  const clip = event.clipboardData?.getData("text");
+  if (!clip) return;
+  // Jika hanya 1 sel (tanpa tab/baris baru), biarkan perilaku paste default browser
+  if (!clip.includes("\t") && !clip.includes("\n")) return;
+
+  event.preventDefault();
+
+  const baris = clip
+    .replace(/\r/g, "")
+    .split("\n")
+    .filter((_, idx, arr) => !(idx === arr.length - 1 && arr[idx] === ""));
+
+  baris.forEach((rowStr, i) => {
+    const sel = rowStr.split("\t");
+    const targetRow = rowIdx + i;
+    while (targetRow >= data.mahasiswa.length) {
+      data.mahasiswa.push({ nim: "", nama: "", nilai: {} });
+    }
+    if (kolom === "nim") {
+      if (sel[0] !== undefined) data.mahasiswa[targetRow].nim = sel[0].trim();
+      if (sel[1] !== undefined) data.mahasiswa[targetRow].nama = sel[1].trim();
+    } else {
+      if (sel[0] !== undefined) data.mahasiswa[targetRow].nama = sel[0].trim();
+    }
+  });
+
   saveData();
 }
 
@@ -1581,7 +1635,7 @@ function generateSubInputs() {
   modalData.subList = Array.from({ length: n > 0 ? n : 0 }, () => ({
     open: true,
     totalBobot: 0,
-    komponen: [{ nama: KOMPONEN_LIST[0], bobot: 0 }],
+    komponen: [{ nama: KOMPONEN_LIST[0], bobot: 0, namaCustom: "" }],
   }));
 }
 
@@ -1654,15 +1708,29 @@ function handleAddSubCPMK() {
       );
       return;
     }
+    // Validasi nama komponen kustom ("Lainnya") wajib diisi
+    const komponenKosong = s.komponen.find(
+      (k) => k.nama === KOMPONEN_LAINNYA && !k.namaCustom?.trim(),
+    );
+    if (komponenKosong) {
+      alert(
+        `Sub-CPMK ${i + 1}: Nama komponen "Lainnya" wajib diisi manual.`,
+      );
+      return;
+    }
     const subData = {
       name: `Sub-CPMK ${lastNum + 1}`,
       totalBobot,
       standar: 80,
-      bobotItems: s.komponen.map((k) => ({
-        nama: k.nama,
-        bobot: k.bobot,
-        label: k.nama,
-      })),
+      bobotItems: s.komponen.map((k) => {
+        const namaFinal =
+          k.nama === KOMPONEN_LAINNYA ? k.namaCustom.trim() : k.nama;
+        return {
+          nama: namaFinal,
+          bobot: k.bobot,
+          label: namaFinal,
+        };
+      }),
     };
     nomorKomponenDuplikat(subData);
     data.cplList[ci].cpmkList[mi].subCpmkList.push(subData);
@@ -2646,6 +2714,41 @@ tbody td input.nama-input {
   font-size: 0.75rem;
 }
 
+/* ── ADD ROW LINE (baris kosong "+" untuk menambah mahasiswa) ── */
+.add-row-line {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.add-row-line:hover {
+  background: #fdf2f4;
+}
+.add-row-line:hover .add-row-plus {
+  background: #9b1530;
+  color: #fff;
+}
+.add-row-cell {
+  padding: 12px 14px;
+  text-align: left;
+  color: #9ca3af;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-bottom: 1px dashed #e2e6ef;
+}
+.add-row-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f3e8eb;
+  color: #9b1530;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-right: 8px;
+  transition: all 0.18s;
+}
+
 /* ── MANAGE BUTTONS ── */
 .edit-btn, .delete-btn, .fill-column-btn {
   border: none; cursor: pointer;
@@ -2947,6 +3050,23 @@ tbody td input.nama-input {
 .komponen-item select,
 .komponen-item input {
   margin-bottom: 0;
+}
+.komponen-custom-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1.5px solid #9b1530;
+  border-radius: 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 0.82rem;
+  color: #1f2937;
+  background: #fff7f8;
+  outline: none;
+  box-sizing: border-box;
+}
+.komponen-custom-input:focus {
+  border-color: #9b1530;
+  box-shadow: 0 0 0 3px rgba(155, 21, 48, 0.08);
 }
 .btn-add-komponen {
   border: none;
