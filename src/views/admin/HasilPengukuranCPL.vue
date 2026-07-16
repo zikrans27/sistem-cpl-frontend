@@ -1089,8 +1089,10 @@ onMounted(async () => {
 }
 .ht-wide-table th {
   vertical-align: middle;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   border: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1.3;
 }
 .ht-wide-table td {
   border: 1px solid #e5e7eb;
@@ -1103,14 +1105,18 @@ onMounted(async () => {
 .wt-cpmk-hdr {
   background: #134a73 !important;
   color: #ffffff;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 600;
+  min-width: 110px;
+  padding: 8px 6px !important;
 }
 .wt-sub-hdr {
   background: #1d6fa5 !important;
   color: #ffffff;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 600;
+  min-width: 90px;
+  padding: 8px 6px !important;
 }
 .wt-komponen-hdr {
   background: #1a1d2e !important;
@@ -1140,6 +1146,7 @@ onMounted(async () => {
 .ht-wide-table .col-nim,
 .ht-wide-table .col-nama {
   border: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
 }
 
 /* header utama tabel ringkasan kelas & detail mahasiswa — gradasi biru navy → charcoal, teks putih */
