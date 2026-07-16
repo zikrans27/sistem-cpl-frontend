@@ -170,47 +170,19 @@
                   </template>
                 </template>
               </tr>
-              <!-- Baris 4: Komponen (dengan persen bobot) -->
+              <!-- Baris 4: Komponen (dengan persen bobot) — pakai leafColumns supaya bisa dikasih garis batas grup -->
               <tr>
-                <template
-                  v-for="cpl in data.cplList"
-                  :key="'w-k-cpl-' + cpl.name"
+                <th
+                  v-for="(col, ci5) in leafColumns"
+                  :key="'w-k-' + ci5"
+                  class="wt-komponen-hdr"
+                  :class="leafBorderClass(col)"
                 >
-                  <template
-                    v-for="cpmk in cpl.cpmkList"
-                    :key="'w-k-cpmk-' + cpl.name + '-' + cpmk.name"
+                  {{ col.label
+                  }}<template v-if="col.bobot !== null">
+                    - {{ col.bobot }}%</template
                   >
-                    <template
-                      v-for="sub in cpmk.subCpmkList"
-                      :key="
-                        'w-k-sub-' + cpl.name + '-' + cpmk.name + '-' + sub.name
-                      "
-                    >
-                      <th
-                        v-if="sub.bobotItems.length === 0"
-                        class="wt-komponen-hdr"
-                      >
-                        —
-                      </th>
-                      <th
-                        v-for="b in sub.bobotItems"
-                        :key="
-                          'w-k-' +
-                          cpl.name +
-                          '-' +
-                          cpmk.name +
-                          '-' +
-                          sub.name +
-                          '-' +
-                          (b.label || b.nama)
-                        "
-                        class="wt-komponen-hdr"
-                      >
-                        {{ b.label || b.nama }} - {{ b.bobot }}%
-                      </th>
-                    </template>
-                  </template>
-                </template>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -228,6 +200,7 @@
                   v-for="(val, ci2) in row.komponenValues"
                   :key="'wt-k-' + idx + '-' + ci2"
                   class="kmp-val"
+                  :class="leafBorderClass(leafColumns[ci2])"
                 >
                   {{ val }}
                 </td>
@@ -642,6 +615,43 @@ function hitungSubPerMhs(mhs, sub, ci, mi, si) {
     capaianSub += (isNaN(val) ? 0 : val / 100) * b.bobot;
   });
   return sub.totalBobot > 0 ? (capaianSub / sub.totalBobot) * 100 : 0;
+}
+
+// ── Daftar kolom "leaf" (komponen) yang di-flatten, lengkap dengan info
+//    apakah kolom ini adalah kolom TERAKHIR dalam grup Sub-CPMK / CPMK / CPL-nya.
+//    Dipakai untuk menaruh garis pembatas yang jelas antar grup.
+const leafColumns = computed(() => {
+  const cols = [];
+  data.cplList.forEach((cpl, ci) => {
+    const cpmkList = cpl.cpmkList || [];
+    cpmkList.forEach((cpmk, mi) => {
+      const subList = cpmk.subCpmkList || [];
+      subList.forEach((sub, si) => {
+        const items = sub.bobotItems && sub.bobotItems.length ? sub.bobotItems : [null];
+        items.forEach((b, bi) => {
+          const isLastOfSub = bi === items.length - 1;
+          const isLastOfCpmk = isLastOfSub && si === subList.length - 1;
+          const isLastOfCpl = isLastOfCpmk && mi === cpmkList.length - 1;
+          cols.push({
+            label: b ? b.label || b.nama : "—",
+            bobot: b ? b.bobot : null,
+            isLastOfSub,
+            isLastOfCpmk,
+            isLastOfCpl,
+          });
+        });
+      });
+    });
+  });
+  return cols;
+});
+
+function leafBorderClass(col) {
+  if (!col) return "";
+  if (col.isLastOfCpl) return "col-end-cpl";
+  if (col.isLastOfCpmk) return "col-end-cpmk";
+  if (col.isLastOfSub) return "col-end-sub";
+  return "";
 }
 
 // ── SECTION 1: Wide-table helpers (mengikuti format sheet 'Praktik') ──
@@ -1091,7 +1101,7 @@ onMounted(async () => {
   vertical-align: middle;
   white-space: normal;
   word-break: break-word;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   line-height: 1.3;
 }
 .ht-wide-table td {
@@ -1101,6 +1111,7 @@ onMounted(async () => {
   background: #0c2d4a !important;
   color: #ffffff;
   font-size: 0.78rem;
+  border-right: 4px solid #f97316 !important;
 }
 .wt-cpmk-hdr {
   background: #134a73 !important;
@@ -1109,6 +1120,7 @@ onMounted(async () => {
   font-weight: 600;
   min-width: 110px;
   padding: 8px 6px !important;
+  border-right: 3px solid #fbbf24 !important;
 }
 .wt-sub-hdr {
   background: #1d6fa5 !important;
@@ -1117,6 +1129,7 @@ onMounted(async () => {
   font-weight: 600;
   min-width: 90px;
   padding: 8px 6px !important;
+  border-right: 2px solid #ffffff !important;
 }
 .wt-komponen-hdr {
   background: #1a1d2e !important;
@@ -1124,8 +1137,21 @@ onMounted(async () => {
   font-size: 0.65rem;
   font-weight: 500;
   white-space: normal;
-  max-width: 90px;
+  overflow-wrap: break-word;
+  min-width: 92px;
   padding: 8px 6px !important;
+}
+
+/* ── Garis pembatas antar grup (nyambung dari header sampai baris data) ──
+   Sub-CPMK: garis putih tipis | CPMK: garis kuning/emas | CPL: garis oranye tebal */
+.col-end-sub {
+  border-right: 2px solid #ffffff !important;
+}
+.col-end-cpmk {
+  border-right: 3px solid #fbbf24 !important;
+}
+.col-end-cpl {
+  border-right: 4px solid #f97316 !important;
 }
 .wt-cpmk-group-hdr {
   background: #374151 !important;
