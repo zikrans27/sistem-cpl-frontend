@@ -1111,7 +1111,7 @@ onMounted(async () => {
   background: #0c2d4a !important;
   color: #ffffff;
   font-size: 0.78rem;
-  border-right: 4px solid #f97316 !important;
+  border-right: 4px solid #ffffff !important;
 }
 .wt-cpmk-hdr {
   background: #134a73 !important;
@@ -1120,7 +1120,7 @@ onMounted(async () => {
   font-weight: 600;
   min-width: 110px;
   padding: 8px 6px !important;
-  border-right: 3px solid #fbbf24 !important;
+  border-right: 3px solid #ffffff !important;
 }
 .wt-sub-hdr {
   background: #1d6fa5 !important;
@@ -1143,15 +1143,25 @@ onMounted(async () => {
 }
 
 /* ── Garis pembatas antar grup (nyambung dari header sampai baris data) ──
-   Sub-CPMK: garis putih tipis | CPMK: garis kuning/emas | CPL: garis oranye tebal */
-.col-end-sub {
+   Header (background gelap) pakai putih; baris data (background terang) pakai abu gelap
+   supaya tetap terlihat — dibedakan lewat ketebalan: Sub-CPMK tipis, CPMK sedang, CPL paling tebal */
+thead .col-end-sub {
   border-right: 2px solid #ffffff !important;
 }
-.col-end-cpmk {
-  border-right: 3px solid #fbbf24 !important;
+thead .col-end-cpmk {
+  border-right: 3px solid #ffffff !important;
 }
-.col-end-cpl {
-  border-right: 4px solid #f97316 !important;
+thead .col-end-cpl {
+  border-right: 4px solid #ffffff !important;
+}
+tbody .col-end-sub {
+  border-right: 2px solid #4b5563 !important;
+}
+tbody .col-end-cpmk {
+  border-right: 3px solid #4b5563 !important;
+}
+tbody .col-end-cpl {
+  border-right: 4px solid #4b5563 !important;
 }
 .wt-cpmk-group-hdr {
   background: #374151 !important;
