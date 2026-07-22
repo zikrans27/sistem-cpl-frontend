@@ -3071,7 +3071,7 @@ tbody td input.nama-input {
 .btn-add-komponen {
   border: none;
   background: #2563eb;
-  color: #ff0000;
+  color: #fff;
   padding: 10px 14px;
   border-radius: 10px;
   cursor: pointer;
